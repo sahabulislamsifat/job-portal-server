@@ -36,10 +36,16 @@ async function run() {
 
     // job related api
     app.get("/jobs", async (req, res) => {
-      const cursor = jobCollection.find();
+      const email = req.query.email;
+      let query = {};
+      if (email) {
+        query = { hr_email: email };
+      }
+      const cursor = jobCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
     });
+
     //job related api
     app.get("/jobs/:id", async (req, res) => {
       const id = req.params.id;
@@ -76,10 +82,35 @@ async function run() {
       res.send(result);
     });
 
+    //
+    app.get("/job-applications/jobs/:job_id", async (req, res) => {
+      const jobId = req.params.job_id;
+      const query = { job_id: jobId };
+      const result = await jobApplicationCollection.find(query).toArray();
+      res.send(result);
+    });
+
     //job application api
     app.post("/job-applications", async (req, res) => {
       const application = req.body;
       const result = await jobApplicationCollection.insertOne(application);
+      // Not the best way (use aggregate)
+      // skip --> it
+      const id = application.job_id;
+      const query = { _id: new ObjectId(id) };
+      const job = await jobCollection.findOne(query);
+      let newCount = 0;
+      if (job.applicationCount) {
+        newCount = job.applicationCount + 1;
+      } else {
+        newCount = 1;
+      }
+      // now update the job info
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: { applicationCount: newCount },
+      };
+      const updateResult = await jobCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
   } finally {
